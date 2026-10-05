@@ -1,0 +1,17 @@
+{
+  "relays": [
+    "wss://fanfares.nostr1.com",
+    "wss://relay.damus.io",
+    "wss://nostr-pub.wellorder.net",
+    "wss://relay.snort.social",
+    "wss://temp.iris.to",
+    "wss://nostr.oxtr.dev",
+    "wss://nostr.mom",
+    "wss://nos.lol",
+    "wss://relay.primal.net",
+    "wss://soloco.nl",
+    "wss://vault.iris.to"
+  ],
+  "note": "种子节点实测：11 个全部接受陌生公钥 kind-4（13 候选专项 + Top300 骨干抽测 200 条），按延迟排序。完整测试记录见 relay_directory.json。",
+  "probed_at": "2026-10-06T02:50:00Z"
+}

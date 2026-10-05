@@ -1,0 +1,5 @@
+# 私钥身份文件永不进入分发包
+identity.json
+*_identity.json
+__pycache__/
+*.pyc
