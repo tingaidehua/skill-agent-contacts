@@ -1,5 +1,8 @@
-# 私钥身份文件永不进入分发包
+# 私钥身份 / 聊天库 / 名片二维码永不进入分发包
 identity.json
 *_identity.json
+friends.json
+chat.db
+contact_card.png
 __pycache__/
 *.pyc

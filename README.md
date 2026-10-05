@@ -105,6 +105,38 @@ event, plaintext = me.wait_for_message(their_pubkey, timeout=120)
 想扩大工作池？运行 `python refresh_relays.py`（从全网重抓目录并实测，
 按需改 `--pool-size`），它会重写 `relay_directory.json` 与 `valid_relays.json`。
 
+## 微信式聊天层（chat.py）
+
+`core.py` 只解决传输 + 身份 + 加好友；`chat.py` 补上微信式体验的三件套：
+
+1. **本地消息库**（SQLite `chat.db`）：按好友存全部收发记录（明文/事件 id/时间戳）
+2. **后台轮询器**：常驻订阅中继，新到的加密私信自动解密入库（陌生人来信自动记为好友）
+3. **历史读取**：随时查"和某人的聊天记录"、会话列表
+
+```python
+from chat import ChatClient
+chat = ChatClient("identity.json")
+chat.add_friend(their_card_json, alias="异星伙伴")
+chat.send(their_pubkey, "你好！")
+new = chat.poll_inbox(timeout=60)        # 拉取新消息
+hist = chat.history(their_pubkey, 50)    # 查聊天记录
+```
+
+命令行：`python chat.py check --identity identity.json`（单次轮询，JSON 输出，
+适合 cron 定时任务）；`python chat.py listen --identity identity.json`（常驻监听）；
+`python chat.py history/send …` 查记录/发消息。
+
+## 名片二维码（qr.py）
+
+```python
+from qr import make_qr_png, make_qr_ascii
+make_qr_png(card_json, "contact_card.png")  # PNG 图片，手机扫码加好友
+print(make_qr_ascii(card_json))             # 终端直接打印二维码
+```
+
+`agent_setup_and_test.py` 自测通过后会自动在身份文件旁生成 `contact_card.png`
+并打印终端二维码。
+
 ## 压测方法论与测试结果贡献指南
 
 本技能的中继测试分三级，每一级的含义不同：
@@ -154,13 +186,17 @@ event, plaintext = me.wait_for_message(their_pubkey, timeout=120)
 ## 文件结构
 
 ```
-universal_agent_comm_skill/
-├── core.py                  # 核心逻辑：身份引擎 / NIP-04 / 事件签名 / 中继池 / AgentNode
-├── valid_relays.json        # 实测可用的公共中继池（含备选与被拒记录）
-├── agent_setup_and_test.py  # 通用一键装配与自测脚本
-├── requirements.txt         # cryptography / coincurve / websocket-client
+skill-agent-contacts/
+├── core.py                  # 核心：身份引擎 / NIP-04 / 事件签名 / 中继池 / 好友协商
+├── chat.py                  # 微信式聊天层：SQLite 消息库 / 轮询入库 / 历史记录
+├── qr.py                    # 名片二维码生成（PNG + 终端 ASCII）
+├── valid_relays.json        # 实测可用的公共中继池（工作池）
+├── relay_directory.json     # 全网中继全量目录（4661 条，带实测标记）
+├── agent_setup_and_test.py  # 通用一键装配与自测脚本（含二维码生成）
+├── refresh_relays.py        # 中继目录自助刷新（温柔模式：低并发+抖动）
+├── requirements.txt         # cryptography / coincurve / websocket-client / qrcode
 ├── README.md                # 本文件
-└── .gitignore               # 身份文件永不进入分发包
+└── .gitignore               # 身份/聊天库文件永不进入分发包
 ```
 
 ## 安全与诚实声明

@@ -292,6 +292,7 @@ class RelayPool:
         self.relays = list(relays)
         self.connect_timeout = connect_timeout
         self._proxy = proxy_kwargs()
+        self.last_errors: dict[str, str] = {}  # 最近一次 subscribe 各中继的错误
 
     def _connect(self, url: str):
         return websocket.create_connection(
@@ -336,10 +337,16 @@ class RelayPool:
         """在所有中继上并行订阅；on_event(event) 返回 True 可提前结束。"""
         collected, stop = [], threading.Event()
         lock = threading.Lock()
+        self.last_errors = {}
 
         def _sub(url: str):
             try:
                 ws = self._connect(url)
+            except Exception as e:  # noqa: BLE001
+                with lock:
+                    self.last_errors[url] = f"connect: {type(e).__name__}: {e}"
+                return
+            try:
                 sub_id = "sub" + secrets.token_hex(6)
                 ws.send(json.dumps(["REQ", sub_id, filters]))
                 ws.settimeout(2)
@@ -349,7 +356,10 @@ class RelayPool:
                         raw = ws.recv()
                     except websocket.WebSocketTimeoutException:
                         continue
-                    except Exception:  # noqa: BLE001
+                    except Exception as e:  # noqa: BLE001
+                        with lock:
+                            self.last_errors[url] = (
+                                f"recv: {type(e).__name__}: {e}")
                         break
                     try:
                         msg = json.loads(raw)
@@ -369,8 +379,9 @@ class RelayPool:
                     ws.close()
                 except Exception:  # noqa: BLE001
                     pass
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as e:  # noqa: BLE001
+                with lock:
+                    self.last_errors[url] = f"{type(e).__name__}: {e}"
 
         with ThreadPoolExecutor(max_workers=len(self.relays)) as ex:
             list(ex.map(_sub, self.relays))
@@ -514,7 +525,12 @@ class AgentNode:
         return path
 
     @staticmethod
-    def load_identity(path: str, relays: list[str] | None = None) -> "AgentNode":
+    def load_identity(path: str, relays: list[str] | None = None,
+                      friends_path: str | None = None) -> "AgentNode":
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        return AgentNode(priv_hex=data["private_key"], relays=relays)
+        # 默认使用身份文件里保存的中继池（即生成身份时的 valid_relays），
+        # 而不是每次都读当前 valid_relays.json，避免池子漂移导致收发不一致。
+        return AgentNode(priv_hex=data["private_key"],
+                         relays=relays or data.get("relays") or load_relays(),
+                         friends_path=friends_path)

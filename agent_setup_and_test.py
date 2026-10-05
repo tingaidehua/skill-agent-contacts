@@ -156,6 +156,18 @@ def main() -> None:
         ok(f"Node_A 永久身份已保存到 {args.identity_out}（0600 权限，请备份）")
         print("Node_A 名片（本沙箱永久通讯身份）：")
         print(card_a)
+        # 生成二维码名片
+        try:
+            from qr import make_qr_png, make_qr_ascii
+            import os as _os
+            png_path = _os.path.join(_os.path.dirname(
+                _os.path.abspath(args.identity_out)), "contact_card.png")
+            make_qr_png(card_a, png_path)
+            ok(f"二维码名片已生成：{png_path}（扫码即得名片 JSON）")
+            print("终端二维码（手机扫码加好友）：")
+            print(make_qr_ascii(card_a))
+        except SystemExit as e:
+            print(f"  （跳过二维码：{e}）")
     else:
         print("（未指定 --identity-out，Node_A 私钥仅存在于本次进程内存）")
 

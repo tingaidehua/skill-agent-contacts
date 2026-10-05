@@ -14,6 +14,7 @@ refresh_relays.py —— 中继目录自助刷新工具
 """
 import argparse
 import json
+import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,6 +22,11 @@ from urllib.parse import urlparse
 
 import core
 import websocket
+
+# 温柔模式：低并发 + 任务间抖动，避免触发出口代理/中继的扫描防护。
+# （教训：70 并发扫 4000+ 主机曾导致本沙箱全部出站流量被限流数分钟。）
+DEFAULT_WORKERS = 6
+JITTER_SLEEP = (0, 1.5)
 
 DEFAULT_SEEDS = [
     "wss://nos.lol",
@@ -62,6 +68,7 @@ def harvest(seeds: list[str], workers: int) -> list[str]:
 
 def probe_connectivity(urls: list[str], workers: int) -> list[dict]:
     def _probe(url: str):
+        time.sleep(random.uniform(*JITTER_SLEEP))
         t0 = time.monotonic()
         ws = None
         try:
@@ -96,6 +103,7 @@ def probe_connectivity(urls: list[str], workers: int) -> list[dict]:
 
 def probe_kind4(reachable: list[dict], workers: int) -> list[dict]:
     def _test(entry: dict):
+        time.sleep(random.uniform(*JITTER_SLEEP))
         url = entry["url"]
         res = dict(entry)
         res.update({"kind4": False, "reason": ""})
@@ -117,7 +125,8 @@ def probe_kind4(reachable: list[dict], workers: int) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser(description="刷新全网 Nostr 中继目录")
     ap.add_argument("--seeds", default=",".join(DEFAULT_SEEDS))
-    ap.add_argument("--workers", type=int, default=60)
+    ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
+                    help=f"并发数（默认 {DEFAULT_WORKERS}，温柔模式，勿调太高）")
     ap.add_argument("--pool-size", type=int, default=10,
                     help="写入 valid_relays.json 的工作池大小")
     ap.add_argument("--out", default=".")
